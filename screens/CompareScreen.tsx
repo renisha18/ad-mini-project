@@ -1,20 +1,39 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LeetCodeStats, fetchUserStats } from "../services/api";
+import { T } from "../constants/theme";
+import AppInput from "../components/ui/AppInput";
+import AppButton from "../components/ui/AppButton";
+import Card from "../components/ui/Card";
 
-type Props = {
-  username: string;
+type Props = { username: string };
+
+type StatRowProps = {
+  label: string;
+  a: number | string;
+  b: number | string;
+  aWins?: boolean;
+  bWins?: boolean;
 };
 
-function Row({ label, a, b, lowerIsBetter }: { label: string; a: number; b: number; lowerIsBetter?: boolean }) {
-  const betterA = lowerIsBetter ? a < b : a > b;
-  const betterB = lowerIsBetter ? b < a : b > a;
+function StatRow({ label, a, b, aWins, bWins }: StatRowProps) {
   return (
-    <View style={styles.row}>
-      <Text style={[styles.value, betterA && styles.bold]}>{a}</Text>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={[styles.value, styles.valueRight, betterB && styles.bold]}>{b}</Text>
+    <View style={styles.statRow}>
+      <Text style={[styles.rowVal, aWins && styles.winVal]}>{a}</Text>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowVal, styles.rowValRight, bWins && styles.winVal]}>{b}</Text>
     </View>
+  );
+}
+
+function UserCard({ stats, highlight }: { stats: LeetCodeStats; highlight?: boolean }) {
+  return (
+    <Card style={[styles.userCard, highlight && styles.userCardHighlight]}>
+      <Text style={styles.cardUsername}>{stats.username}</Text>
+      <Text style={styles.cardTotal}>{stats.totalSolved}</Text>
+      <Text style={styles.cardTotalLabel}>solved</Text>
+      <Text style={styles.cardRank}>#{stats.ranking.toLocaleString()}</Text>
+    </Card>
   );
 }
 
@@ -26,10 +45,7 @@ export default function CompareScreen({ username }: Props) {
   const [error, setError] = useState("");
 
   const handleCompare = async () => {
-    if (!username || !friendUsername.trim()) {
-      setError("User not found");
-      return;
-    }
+    if (!friendUsername.trim()) { setError("Enter a username to compare"); return; }
     setLoading(true);
     setError("");
     try {
@@ -46,49 +62,104 @@ export default function CompareScreen({ username }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       <Text style={styles.title}>Compare</Text>
-      <Text style={styles.text}>You: {username}</Text>
-      <TextInput
+      <Text style={styles.subtitle}>You vs anyone on LeetCode</Text>
+
+      <AppInput
         value={friendUsername}
         onChangeText={setFriendUsername}
-        placeholder="Friend username"
-        style={styles.input}
+        placeholder="Enter username to compare"
         autoCapitalize="none"
+        autoCorrect={false}
       />
-      <Pressable style={styles.button} onPress={handleCompare}>
-        <Text style={styles.buttonText}>{loading ? "Loading..." : "Compare"}</Text>
-      </Pressable>
+      <AppButton label="Compare" loading={loading} onPress={handleCompare} />
+
       {!!error && <Text style={styles.error}>{error}</Text>}
 
-      {mine && friend ? (
-        <View style={styles.card}>
-          <Text style={styles.text}>{mine.username} vs {friend.username}</Text>
-          <Row label="Total Solved" a={mine.totalSolved} b={friend.totalSolved} />
-          <Row label="Easy" a={mine.easySolved} b={friend.easySolved} />
-          <Row label="Medium" a={mine.mediumSolved} b={friend.mediumSolved} />
-          <Row label="Hard" a={mine.hardSolved} b={friend.hardSolved} />
-          <Row label="Ranking" a={mine.ranking} b={friend.ranking} lowerIsBetter />
-          <Row label="Acceptance" a={mine.acceptanceRate} b={friend.acceptanceRate} />
+      {loading && !mine && (
+        <View style={styles.center}>
+          <ActivityIndicator color={T.primary} size="large" />
         </View>
-      ) : null}
-    </View>
+      )}
+
+      {mine && friend && (
+        <>
+          {/* User cards side by side */}
+          <View style={styles.cardsRow}>
+            <UserCard stats={mine} highlight={mine.totalSolved >= friend.totalSolved} />
+            <View style={styles.vsWrap}><Text style={styles.vs}>VS</Text></View>
+            <UserCard stats={friend} highlight={friend.totalSolved > mine.totalSolved} />
+          </View>
+
+          {/* Detailed comparison */}
+          <Card>
+            <Text style={styles.sectionTitle}>Head to Head</Text>
+            <StatRow
+              label="Total"
+              a={mine.totalSolved} b={friend.totalSolved}
+              aWins={mine.totalSolved > friend.totalSolved}
+              bWins={friend.totalSolved > mine.totalSolved}
+            />
+            <StatRow
+              label="Easy"
+              a={mine.easySolved} b={friend.easySolved}
+              aWins={mine.easySolved > friend.easySolved}
+              bWins={friend.easySolved > mine.easySolved}
+            />
+            <StatRow
+              label="Medium"
+              a={mine.mediumSolved} b={friend.mediumSolved}
+              aWins={mine.mediumSolved > friend.mediumSolved}
+              bWins={friend.mediumSolved > mine.mediumSolved}
+            />
+            <StatRow
+              label="Hard"
+              a={mine.hardSolved} b={friend.hardSolved}
+              aWins={mine.hardSolved > friend.hardSolved}
+              bWins={friend.hardSolved > mine.hardSolved}
+            />
+            <StatRow
+              label="Rank"
+              a={`#${mine.ranking.toLocaleString()}`}
+              b={`#${friend.ranking.toLocaleString()}`}
+              aWins={mine.ranking < friend.ranking && mine.ranking > 0}
+              bWins={friend.ranking < mine.ranking && friend.ranking > 0}
+            />
+            <StatRow
+              label="Accept %"
+              a={`${mine.acceptanceRate}%`}
+              b={`${friend.acceptanceRate}%`}
+              aWins={mine.acceptanceRate > friend.acceptanceRate}
+              bWins={friend.acceptanceRate > mine.acceptanceRate}
+            />
+          </Card>
+        </>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 20 },
-  title: { fontSize: 28, fontWeight: "700", color: "#000", marginBottom: 10 },
-  text: { color: "#000", marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: "#000", color: "#000", padding: 12, marginBottom: 10 },
-  button: { borderWidth: 1, borderColor: "#000", padding: 12, alignItems: "center" },
-  buttonText: { color: "#000", fontWeight: "700" },
-  error: { color: "#000", marginTop: 10, fontWeight: "700" },
-  card: { borderWidth: 1, borderColor: "#000", padding: 12, marginTop: 14 },
-  row: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
-  label: { color: "#000", fontWeight: "700" },
-  value: { color: "#000", width: "30%" },
-  valueRight: { textAlign: "right" },
-  bold: { fontWeight: "900" },
+  screen: { flex: 1, backgroundColor: T.bg },
+  container: { padding: T.padding, paddingBottom: 32 },
+  title: { fontSize: 22, fontWeight: "700", color: T.textPrimary, marginBottom: 4 },
+  subtitle: { fontSize: 13, color: T.textSecondary, marginBottom: 20 },
+  error: { color: T.hard, fontSize: 13, marginBottom: 12 },
+  center: { alignItems: "center", marginVertical: 32 },
+  cardsRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  userCard: { flex: 1, alignItems: "center" },
+  userCardHighlight: { borderColor: T.primary },
+  cardUsername: { fontSize: 13, color: T.textSecondary, marginBottom: 6 },
+  cardTotal: { fontSize: 32, fontWeight: "800", color: T.textPrimary },
+  cardTotalLabel: { fontSize: 11, color: T.textSecondary },
+  cardRank: { fontSize: 13, color: T.accent, marginTop: 4 },
+  vsWrap: { paddingHorizontal: 8 },
+  vs: { fontSize: 14, fontWeight: "700", color: T.textSecondary },
+  sectionTitle: { fontSize: 13, fontWeight: "600", color: T.textSecondary, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
+  statRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: T.border },
+  rowLabel: { fontSize: 13, color: T.textSecondary, flex: 1, textAlign: "center" },
+  rowVal: { fontSize: 14, color: T.textPrimary, width: 70 },
+  rowValRight: { textAlign: "right" },
+  winVal: { color: T.accent, fontWeight: "700" },
 });
-
