@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
 import { Redirect, useFocusEffect } from "expo-router";
-import HomeScreen from "../../screens/HomeScreen";
+import CompareScreen from "../../screens/CompareScreen";
 import { getCurrentUser } from "../../services/storage";
 
-export default function HomeRoute() {
+export default function CompareRoute() {
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,5 +25,6 @@ export default function HomeRoute() {
 
   if (loading) return null;
   if (!username) return <Redirect href="/(auth)/login" />;
-  return <HomeScreen username={username} onLoggedOut={() => setUsername(null)} />;
+  return <CompareScreen username={username} />;
 }
+
